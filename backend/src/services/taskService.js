@@ -48,7 +48,7 @@ const validateAndClean = (body, isUpdate) => {
 
   if (body.dueDate !== undefined) {
     if (body.dueDate === null || body.dueDate === '') {
-      values.dueDate = null; // lets the client clear the due date
+      values.dueDate = null;
     } else if (typeof body.dueDate !== 'string' || Number.isNaN(new Date(body.dueDate).getTime())) {
       errors.push('dueDate must be a valid date string, e.g. "2026-12-31" or "2026-12-31T10:00:00Z"');
     } else {
@@ -113,7 +113,7 @@ export const createTask = (body) => {
 };
 
 export const updateTask = (id, body) => {
-  const index = findIndexById(id); // 404 first if the task does not exist
+  const index = findIndexById(id);
   assertBodyIsObject(body);
 
   const { errors, values } = validateAndClean(body, true);
