@@ -67,8 +67,22 @@ const findIndexById = (id) => {
   return index;
 };
 
-export const getAllTasks = () => {
-  return tasks.map((task) => ({ ...task }));
+export const getAllTasks = (search) => {
+  if (search !== undefined && typeof search !== 'string') {
+    throw new AppError(400, 'Query parameter "search" must be a single text value');
+  }
+
+  const term = (search ?? '').trim().toLowerCase();
+  const matches =
+    term === ''
+      ? tasks
+      : tasks.filter(
+          (task) =>
+            task.title.toLowerCase().includes(term) ||
+            task.description.toLowerCase().includes(term),
+        );
+
+  return matches.map((task) => ({ ...task }));
 };
 
 export const getTaskById = (id) => {

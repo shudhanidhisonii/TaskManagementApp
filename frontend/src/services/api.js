@@ -9,6 +9,12 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (axios.isCancel(error)) {
+      const canceled = new Error('Request canceled');
+      canceled.canceled = true;
+      return Promise.reject(canceled);
+    }
+
     const data = error.response?.data;
     let message = data?.message;
     if (!message) {
@@ -27,6 +33,8 @@ const taskUrl = (id) => `/tasks/${encodeURIComponent(id)}`;
 
 export const taskApi = {
   getTasks: async () => (await api.get('/tasks')).data.data,
+  searchTasks: async (term, signal) =>
+    (await api.get('/tasks', { params: { search: term }, signal })).data.data,
   getTask: async (id) => (await api.get(taskUrl(id))).data.data,
   createTask: async (payload) => (await api.post('/tasks', payload)).data.data,
   updateTask: async (id, payload) => (await api.put(taskUrl(id), payload)).data.data,

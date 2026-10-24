@@ -2,7 +2,7 @@ import * as taskService from '../services/taskService.js';
 
 export const getAllTasks = (req, res, next) => {
   try {
-    const tasks = taskService.getAllTasks();
+    const tasks = taskService.getAllTasks(req.query.search);
     res.status(200).json({ success: true, count: tasks.length, data: tasks });
   } catch (error) {
     next(error);

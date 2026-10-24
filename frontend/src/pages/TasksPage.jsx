@@ -1,10 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Search, SearchX, X, Inbox } from 'lucide-react';
+import { Inbox, Loader2, Plus, Search, SearchX, X } from 'lucide-react';
 import TaskCard from '../components/TaskCard.jsx';
 import { EmptyState, ErrorState, Loader } from '../components/StateViews.jsx';
 import { useTasks } from '../context/TaskContext.jsx';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
+import useTaskSearch from '../hooks/useTaskSearch.js';
 import { PRIORITY_OPTIONS, PRIORITY_RANK, STATUS_OPTIONS } from '../utils/task.js';
+
+const SEARCH_DELAY_MS = 350;
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first', compare: (a, b) => b.createdAt.localeCompare(a.createdAt) },
@@ -21,8 +25,8 @@ const SORT_OPTIONS = [
 export default function TasksPage() {
   const { tasks, loading, error, fetchTasks } = useTasks();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchText, setSearchText] = useState('');
 
-  const query = searchParams.get('q') ?? '';
   const statusParam = searchParams.get('status');
   const priorityParam = searchParams.get('priority');
   const sortParam = searchParams.get('sort');
@@ -37,22 +41,62 @@ export default function TasksPage() {
     setSearchParams(next, { replace: true });
   };
 
+  const trimmedQuery = searchText.trim();
+  const debouncedQuery = useDebouncedValue(trimmedQuery, SEARCH_DELAY_MS);
+  const activeTerm = trimmedQuery === '' ? '' : debouncedQuery;
+  const isSearching = activeTerm !== '';
+  const search = useTaskSearch(loading ? '' : activeTerm, tasks);
+
+  const baseTasks = isSearching ? search.results : tasks;
+  const searchPending =
+    trimmedQuery !== activeTerm || (isSearching && (!search.isCurrent || search.loading));
+
   const visibleTasks = useMemo(() => {
-    const term = query.trim().toLowerCase();
     const { compare } = SORT_OPTIONS.find((option) => option.value === sort);
-    return tasks
+    return baseTasks
       .filter((task) => status === 'all' || task.status === status)
       .filter((task) => priority === 'all' || task.priority === priority)
-      .filter(
-        (task) =>
-          !term ||
-          task.title.toLowerCase().includes(term) ||
-          task.description.toLowerCase().includes(term),
-      )
       .sort(compare);
-  }, [tasks, query, status, priority, sort]);
+  }, [baseTasks, status, priority, sort]);
 
-  const hasFilters = query !== '' || status !== 'all' || priority !== 'all';
+  const hasFilters = trimmedQuery !== '' || status !== 'all' || priority !== 'all';
+  const clearSearch = () => setSearchText('');
+  const clearAll = () => {
+    setSearchText('');
+    setSearchParams({}, { replace: true });
+  };
+
+  let results;
+  if (isSearching && search.error && !searchPending) {
+    results = <ErrorState message={search.error} onRetry={search.retry} />;
+  } else if (visibleTasks.length === 0 && searchPending) {
+    results = <Loader label="Searching…" />;
+  } else if (visibleTasks.length === 0) {
+    results = (
+      <EmptyState
+        icon={SearchX}
+        title={trimmedQuery ? `No tasks match “${trimmedQuery}”` : 'No matching tasks'}
+        message={
+          trimmedQuery
+            ? 'Search looks at task titles and descriptions. Try different keywords or check the spelling.'
+            : 'Try a different filter.'
+        }
+        action={
+          <button type="button" className="btn btn-secondary" onClick={clearAll}>
+            Clear filters
+          </button>
+        }
+      />
+    );
+  } else {
+    results = (
+      <div className="task-grid">
+        {visibleTasks.map((task) => (
+          <TaskCard key={task.id} task={task} />
+        ))}
+      </div>
+    );
+  }
 
   let content;
   if (loading) {
@@ -86,11 +130,12 @@ export default function TasksPage() {
               type="search"
               className="input"
               placeholder="Search by title or description"
-              value={query}
-              onChange={(event) => setParam('q', event.target.value)}
+              autoComplete="off"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
             />
-            {query && (
-              <button type="button" className="search__clear" aria-label="Clear search" onClick={() => setParam('q', '')}>
+            {searchText && (
+              <button type="button" className="search__clear" aria-label="Clear search" onClick={clearSearch}>
                 <X size={16} />
               </button>
             )}
@@ -118,32 +163,23 @@ export default function TasksPage() {
         </div>
 
         <p className="results-count" aria-live="polite">
-          Showing {visibleTasks.length} of {tasks.length} tasks
+          {searchPending ? (
+            <>
+              <Loader2 size={14} className="spin" /> Searching…
+            </>
+          ) : trimmedQuery ? (
+            `Showing ${visibleTasks.length} of ${baseTasks.length} ${baseTasks.length === 1 ? 'result' : 'results'} for “${trimmedQuery}”`
+          ) : (
+            `Showing ${visibleTasks.length} of ${tasks.length} tasks`
+          )}
           {hasFilters && (
-            <button type="button" className="link-button" onClick={() => setSearchParams({}, { replace: true })}>
+            <button type="button" className="link-button" onClick={clearAll}>
               Clear filters
             </button>
           )}
         </p>
 
-        {visibleTasks.length === 0 ? (
-          <EmptyState
-            icon={SearchX}
-            title="No matching tasks"
-            message="Try a different search or clear your filters."
-            action={
-              <button type="button" className="btn btn-secondary" onClick={() => setSearchParams({}, { replace: true })}>
-                Clear filters
-              </button>
-            }
-          />
-        ) : (
-          <div className="task-grid">
-            {visibleTasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        )}
+        {results}
       </>
     );
   }
