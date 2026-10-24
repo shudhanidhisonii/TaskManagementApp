@@ -4,20 +4,12 @@ import { AppError } from '../middleware/errorHandler.js';
 export const TASK_STATUSES = ['pending', 'in_progress', 'completed'];
 export const TASK_PRIORITIES = ['low', 'medium', 'high'];
 
-// The in-memory "database". Data is lost whenever the server restarts.
 const tasks = [];
-
-// Make sure the request body is a plain JSON object like { "title": "..." }
 const assertBodyIsObject = (body) => {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     throw new AppError(400, 'Request body must be a JSON object');
   }
 };
-
-// Validates the fields a client may send and returns only the clean, allowed values.
-// Any other field (id, createdAt, updatedAt, unknown fields) is ignored.
-// isUpdate = true  -> every field is optional
-// isUpdate = false -> title is required
 const validateAndClean = (body, isUpdate) => {
   const errors = [];
   const values = {};
@@ -120,7 +112,6 @@ export const updateTask = (id, body) => {
     ]);
   }
 
-  // id and createdAt are kept from the existing task; updatedAt is set by the server
   const updated = {
     ...tasks[index],
     ...values,

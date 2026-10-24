@@ -10,7 +10,6 @@ app.use(express.json());
 
 app.use('/api/tasks', taskRoutes);
 
-// These two must stay at the very end
 app.use(notFoundHandler);
 app.use(errorHandler);
 
